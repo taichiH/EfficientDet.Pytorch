@@ -26,7 +26,7 @@ class MBConvBlock(nn.Module):
     """
 
     def __init__(self, block_args, global_params):
-        super().__init__()
+        super(MBConvBlock, self).__init__()
         self._block_args = block_args
         self._bn_mom = 1 - global_params.batch_norm_momentum
         self._bn_eps = global_params.batch_norm_epsilon
@@ -120,7 +120,7 @@ class EfficientNet(nn.Module):
     """
 
     def __init__(self, blocks_args=None, global_params=None):
-        super().__init__()
+        super(EfficientNet, self).__init__()
         assert isinstance(blocks_args, list), 'blocks_args should be a list'
         assert len(blocks_args) > 0, 'block args must be greater than 0'
         self._global_params = global_params

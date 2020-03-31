@@ -30,15 +30,72 @@ from torch.utils.data import DataLoader
 from models.efficientdet import EfficientDet
 from models.losses import FocalLoss
 from datasets import VOCDetection, CocoDataset, get_augumentation, detection_collate, Resizer, Normalizer, Augmenter, collater
+from datasets.voc0712 import VOCAnnotationTransform
 from utils import EFFICIENTDET, get_state_dict
 from eval import evaluate, evaluate_coco
+import os.path as osp
+
+TRAFFICLIGHT_CLASSES = ('trafficlight')
+
+class VOCLikeDetection(torch.utils.data.Dataset):
+
+    def __init__(self, root, transform=None):
+        self.target_transform = VOCAnnotationTransform()
+        self.tranform = transform
+
+        self._root_dir = root
+        self._img_files = sorted(os.listdir(
+            osp.join(self._root_dir, 'JPEGImages')))
+        self._anno_filenames = sorted(os.listdir(
+            osp.join(self._root_dir, 'Annotations')))
+
+    def __getitem__(self, index):
+        target = ET.parse(
+            osp.join(self._root_dir, 'Annotations', self._anno_filenames[index])
+        ).getroot()
+        img = cv2.imread(
+            osp.join(self._root_dir, 'JPEGImages', self._img_files[index]))
+        
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = img.astype(np.float32)/255.
+        height, width, channels = img.shape
+
+        target = self.target_transform(target, width, height)
+        target = np.array(target)
+        sample = {'img': img, 'annot': target}
+        if self.transform is not None:
+            sample = self.transform(sample)
+
+        return sample
+
+        # bbox = target[:, :4]
+        # labels = target[:, 4]
+
+        # return {'image': img, 'bboxes': bbox, 'category_id': labels}
+
+    def __len__(self):
+        return len(self._img_files)
+
+    def num_classes(self):
+        return len(TRAFFICLIGHT_CLASSES)
+
+    def label_to_name(self, label):
+        return TRAFFICLIGHT_CLASSES[label]
+
+    def load_annotations(self, index):
+        img_id = self.ids[index]
+        anno = ET.parse(self._annopath % img_id).getroot()
+        gt = self.target_transform(anno, 1, 1)
+        gt = np.array(gt)
+        return gt
+
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
 parser.add_argument('--dataset', default='VOC', choices=['VOC', 'COCO'],
                     type=str, help='VOC or COCO')
 parser.add_argument(
     '--dataset_root',
-    default='/root/data/VOCdevkit/',
+    default='/home/taichi/Downloads/data/VOCdevkit/',
     help='Dataset root directory path [/root/data/VOCdevkit/, /root/data/coco/]')
 parser.add_argument('--network', default='efficientdet-d0', type=str,
                     help='efficientdet-[d0, d1, ..]')
@@ -171,30 +228,12 @@ def main_worker(gpu, ngpus_per_node, args):
             rank=args.rank)
 
     # Training dataset
-    train_dataset = []
-    if(args.dataset == 'VOC'):
-        train_dataset = VOCDetection(root=args.dataset_root, transform=transforms.Compose(
-            [Normalizer(), Augmenter(), Resizer()]))
-        valid_dataset = VOCDetection(root=args.dataset_root, image_sets=[(
-            '2007', 'test')], transform=transforms.Compose([Normalizer(), Resizer()]))
-        args.num_class = train_dataset.num_classes()
-    elif(args.dataset == 'COCO'):
-        train_dataset = CocoDataset(
-            root_dir=args.dataset_root,
-            set_name='train2017',
-            transform=transforms.Compose(
-                [
-                    Normalizer(),
-                    Augmenter(),
-                    Resizer()]))
-        valid_dataset = CocoDataset(
-            root_dir=args.dataset_root,
-            set_name='val2017',
-            transform=transforms.Compose(
-                [
-                    Normalizer(),
-                    Resizer()]))
-        args.num_class = train_dataset.num_classes()
+
+    dataset = VOCLikeDetection(root=args.dataset_root)
+    args.num_class = dataset.num_classes()
+    train_size = int(len(dataset) * 0.8)
+    test_size = len(dataset) - train_size
+    train_dataset, valid_dataset = torch.utils.data.random_split(dataset, [train_size, test_size])
 
     train_loader = DataLoader(train_dataset,
                               batch_size=args.batch_size,

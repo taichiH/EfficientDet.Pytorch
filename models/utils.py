@@ -103,7 +103,7 @@ class Conv2dDynamicSamePadding(nn.Conv2d):
     """ 2D Convolutions like TensorFlow, for a dynamic image size """
 
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, dilation=1, groups=1, bias=True):
-        super().__init__(in_channels, out_channels,
+        super(Conv2dDynamicSamePadding, self).__init__(in_channels, out_channels,
                          kernel_size, stride, 0, dilation, groups, bias)
         self.stride = self.stride if len(self.stride) == 2 else [
             self.stride[0]] * 2
@@ -127,7 +127,7 @@ class Conv2dStaticSamePadding(nn.Conv2d):
     """ 2D Convolutions like TensorFlow, for a fixed image size"""
 
     def __init__(self, in_channels, out_channels, kernel_size, image_size=None, **kwargs):
-        super().__init__(in_channels, out_channels, kernel_size, **kwargs)
+        super(Conv2dStaticSamePadding, self).__init__(in_channels, out_channels, kernel_size, **kwargs)
         self.stride = self.stride if len(self.stride) == 2 else [
             self.stride[0]] * 2
 

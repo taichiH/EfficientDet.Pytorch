@@ -68,6 +68,7 @@ class VOCAnnotationTransform(object):
         return res  # [[xmin, ymin, xmax, ymax, label_ind], ... ]
 
 
+
 class VOCDetection(data.Dataset):
     """VOC Detection Dataset Object
     input is image, target is annotation
